@@ -30,7 +30,8 @@ struct Parameters {
 };
 
 
-void* frequencyAnalysis(void* args);
+//void frequencyAnalysis(struct Parameters* info);
+void* frequencyAnalysis(void* arg);
 void printStats(struct FreqTable table);	//prints some statistics from a frequency table
 int searchWord(struct FreqTable* table, char* searchWord);
 struct FreqTable* initFreqTable(size_t size);
@@ -43,50 +44,39 @@ size_t insert(struct FreqTable** table, char* word);	//inserts word in hashtble
 int find(struct FreqTable* table, char* word);	//find a certain entry in a table
 void* userInteraction();
 
-void* readFile(char* fileName, char** fileContent, size_t* fileSize)
-{
-	/* READ FILE */
-
-	FILE* filePointer = fopen(fileName, "r"); // Opens file
-	fseek(filePointer, 0, SEEK_END); // Seek the the end of the file
-	*fileSize = ftell(filePointer);	// Gets position i.o.w size
-	fseek(filePointer, 0, SEEK_SET); // Gets back to the front
-	*fileContent = malloc((sizeof(char) * (*fileSize))); // Creates file buffer
-	fread(*fileContent, sizeof(char), *fileSize, filePointer); // Reads file
-	fclose(filePointer);
-
-	return NULL;
-}
-
-unsigned int nThreads = 1;
+const unsigned int nThreads = 1;
 struct FreqTable* result;
 
 int main(int argc, char ** argv)
 {
-	char fileName[256] = "lol4.txt\0";
-	const unsigned int nThreads2 = 2; 
+	char fileName[256];
 
 	struct timeval startTime, endTime;
 	double time;
 
+	pthread_t threadIDs[2];
+	
+	
 	result = initFreqTable(1000);
 
-//	printf("Input file: ");
-//	scanf("%s", fileName);
-//	getchar();
-	pthread_t threadIDs[nThreads2];
-	pthread_create(&threadIDs[0],
-			NULL,
-			userInteraction,
-			NULL);
+	printf("Input file: ");
+	scanf("%s", fileName);
+	getchar();
+
+	pthread_create(&threadIDs[0], NULL, userInteraction, NULL);
 	
-//	userInteraction(); 
-		
 	/* READ FILE */
-	printf("Reading file: %s\n", fileName);
+	FILE* filePointer = fopen(fileName, "r");
 	char* fileContent;
 	size_t fileSize;
-	readFile(fileName, &fileContent, &fileSize);
+	fseek(filePointer, 0, SEEK_END);
+	fileSize = ftell(filePointer);
+	fseek(filePointer, 0, SEEK_SET);
+	fileContent = malloc((sizeof(char) * fileSize));
+	fread(fileContent, sizeof(char), fileSize, filePointer);
+	fclose(filePointer);
+
+
 	/* START THREADS */
 	gettimeofday(&startTime, NULL);
 	struct Parameters* params = (struct Parameters*)malloc(nThreads * sizeof(struct Parameters));
@@ -96,13 +86,9 @@ int main(int argc, char ** argv)
 		params[i].fileContent = fileContent;
 		params[i].fileSize = fileSize;
 	}
-	pthread_create(&threadIDs[1],
-			NULL,
-			frequencyAnalysis, 
-			(void*) &params); 	
-//	frequencyAnalysis((void*) &params);
+	pthread_create(&threadIDs[1], NULL, frequencyAnalysis, (void*)params);
+	pthread_join(&threadIDs[1],NULL);
 	gettimeofday(&endTime, NULL);
-	printf("Analysis completed\n");
 	
 	time = endTime.tv_sec - startTime.tv_sec + (endTime.tv_usec - startTime.tv_usec)/1000000.0;
 	printf("Analysis took %.3f seconds\n\n", time);
@@ -113,11 +99,58 @@ int main(int argc, char ** argv)
 
 	return 0;
 }
-
-
-void* frequencyAnalysis(void* args) 
+void* frequencyAnalysis(void* arg) 
 {
-	struct Parameters* info = (struct Parameters*) args;
+	struct Parameters* info = (struct Parameters*) arg;
+	char *wordFromFile, *fileContent;
+	int found;
+	size_t fileSize = info->fileSize;
+
+	int offset = info->threadNr * fileSize / nThreads;
+	int readBytes;
+	if (info->threadNr != nThreads - 1)
+		readBytes = fileSize / nThreads;
+	else
+		readBytes = fileSize / nThreads + fileSize % nThreads;
+
+	fileContent = malloc((sizeof(char) * readBytes+1));
+	strncpy(fileContent,(info->fileContent)+offset,readBytes+1);
+	fileContent[readBytes] = '\0';
+	for (int i = 0; i < readBytes; i++)
+		if (!isalpha(fileContent[i]) && fileContent[i] != 0x27)
+			fileContent[i] = ' ';
+	char* savePtr;
+	wordFromFile = strtok_r(fileContent, " ", &savePtr);
+
+	struct FreqTable* table;
+	table = initFreqTable(1000);
+	while (wordFromFile != NULL)
+	{
+		int j = 0;
+		while(wordFromFile[j] != '\0') {
+			wordFromFile[j] = tolower(wordFromFile[j]);
+			j++;
+		}
+		table->nrOfWords++;
+		size_t index = find(table, wordFromFile);
+		if( index != -1 )
+			table->wordArray[index].count++;
+		else
+		{
+			insert(&table,wordFromFile);
+		}
+		wordFromFile = strtok_r(NULL, " ", &savePtr);
+	}
+
+	mergeFreqTable(&result,table);
+
+	free(fileContent);
+	deleteFreqTable(table);
+	pthread_exit(NULL);
+}
+/*
+void frequencyAnalysis(struct Parameters* info) 
+{
 	char *wordFromFile, *fileContent;
 	int found;
 	size_t fileSize = info->fileSize;
@@ -164,7 +197,7 @@ void* frequencyAnalysis(void* args)
 	deleteFreqTable(table);
 
 }
-
+*/
 
 void printStats(struct FreqTable table)
 {
@@ -378,6 +411,4 @@ void* userInteraction()
 		if (userInput != 'q')
 			printf ("Enter another character: ");
 	}
-
-	// Ingen return, ingen mening. 
 }
