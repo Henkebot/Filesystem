@@ -4,8 +4,12 @@
 #include <semaphore.h>
 #include <unistd.h>
 
-int basket[5];
+#define TRUE 1
+#define BASKET_SIZE 5
+
+int basket[BASKET_SIZE];
 int nrOfContent = 0;
+
 sem_t mutexSizeLeft;
 sem_t mutexSizeNow;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -58,34 +62,38 @@ void* producerLoop(void* arg)
 	int number = *(int*) arg;
 	int item;
 
-	while(1)
+	while(TRUE)
 	{
 		sleep((rand() % 4) + 1);
+
 		item = produce_item();
+
 		sem_post(&mutexSizeNow);
-		pthread_mutex_lock(&lock);	
-		insert_item(item);
-		pthread_mutex_unlock(&lock);
+			pthread_mutex_lock(&lock);	
+				insert_item(item);
+			pthread_mutex_unlock(&lock);
 		sem_wait(&mutexSizeLeft);
+
 		printf("Producer nr %i produced item %i\n", number, item);
 								
 	}
-
-	
 }
 
 void* consumerLoop(void* arg)
 {
 	int number = *(int*) arg;
 	int item;
-	while(1)
+
+	while(TRUE)
 	{	
 		sleep((rand() % 4) + 1);
+
 		sem_wait(&mutexSizeNow);
-		pthread_mutex_lock(&lock);
-		item = remove_item();
-		pthread_mutex_unlock(&lock);
+			pthread_mutex_lock(&lock);
+				item = remove_item();
+			pthread_mutex_unlock(&lock);
 		sem_post(&mutexSizeLeft);
+
 		printf("\t\t\t\tConsumer nr %i consumed item %i\n", number, item);
 	}
 	
@@ -99,14 +107,17 @@ int main(int argc, char* argv[])
 	processArgs(&producers, &consumers, argc, argv);
 	
 	sem_init(&mutexSizeNow, 0, 0);
-	sem_init(&mutexSizeLeft,0, 5);
+	sem_init(&mutexSizeLeft,0, BASKET_SIZE);
 	
+	// Thread Arrays	
 	pthread_t* producerIDs = malloc(producers * sizeof(unsigned));
 	pthread_t* consumerIDs = malloc(consumers * sizeof(unsigned));
-	//Safe numbers
+	
+	//Pre compute indexes
 	int* pNumbers = malloc(	producers * sizeof(int));
 	for(unsigned i = 0; i < producers;i++)
 		pNumbers[i] = i;
+
 	int* cNumbers = malloc( consumers * sizeof(int));
 	for(unsigned i = 0; i < consumers;i++)
 		cNumbers[i] = i;
@@ -114,7 +125,7 @@ int main(int argc, char* argv[])
 	//Create Producers
 	for(unsigned i = 0; i < producers; i++)
 	{
-		pthread_create(&producerIDs[i], NULL, producerLoop, (void*)& pNumbers[i]);	
+		pthread_create(&producerIDs[i], NULL, producerLoop, (void*) &pNumbers[i]);	
 	}
 	
 	for(unsigned i = 0; i < consumers; i++)
@@ -122,7 +133,7 @@ int main(int argc, char* argv[])
 		pthread_create(&consumerIDs[i],NULL,consumerLoop, (void*) &cNumbers[i]);
 	}
 
-
+	// Incase the program somehow completes
 	for(unsigned i = 0; i < producers; i++)
 		pthread_join(producerIDs[i],NULL);
 
