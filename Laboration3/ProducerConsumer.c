@@ -68,19 +68,20 @@ void* producerLoop(void* arg)
 
 		item = produce_item();
 
-		sem_post(&mutexSizeNow);
+		sem_wait(&mutexSizeLeft);
 			pthread_mutex_lock(&lock);	
 				insert_item(item);
+				printf("Producer nr %i produced item %i\n", number, item);
 			pthread_mutex_unlock(&lock);
-		sem_wait(&mutexSizeLeft);
+		sem_post(&mutexSizeNow);
 
-		printf("Producer nr %i produced item %i\n", number, item);
 								
 	}
 }
 
 void* consumerLoop(void* arg)
 {
+	
 	int number = *(int*) arg;
 	int item;
 
@@ -91,16 +92,17 @@ void* consumerLoop(void* arg)
 		sem_wait(&mutexSizeNow);
 			pthread_mutex_lock(&lock);
 				item = remove_item();
+				printf("\t\t\t\tConsumer nr %i consumed item %i\n", number, item);
 			pthread_mutex_unlock(&lock);
 		sem_post(&mutexSizeLeft);
 
-		printf("\t\t\t\tConsumer nr %i consumed item %i\n", number, item);
 	}
 	
 }
 
 int main(int argc, char* argv[])
 {
+	
 	unsigned producers = 0;
 	unsigned consumers = 0;
 	
@@ -127,7 +129,7 @@ int main(int argc, char* argv[])
 	{
 		pthread_create(&producerIDs[i], NULL, producerLoop, (void*) &pNumbers[i]);	
 	}
-	
+	//Create Consumers	
 	for(unsigned i = 0; i < consumers; i++)
 	{
 		pthread_create(&consumerIDs[i],NULL,consumerLoop, (void*) &cNumbers[i]);
