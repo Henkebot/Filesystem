@@ -27,7 +27,7 @@ private:
 
 	Inode& operator=(const Inode &other);
 public:
-	bool setName(const char *&name);
+	void setName(char *&name);
 	int getID() const;
 	time_t getTimeStamp() const;
 	char* getName() const;

@@ -49,3 +49,8 @@ Inode & Inode::operator=(const Inode & other)
 
 	return *this;
 }
+
+void Inode::setName(char *& name)
+{
+	this->name = name;
+}
